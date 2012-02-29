@@ -121,14 +121,14 @@ class IRCClient(irc.IRCClient):
             for channel in message["channels"]:
                 text = self._encode(channel, message["text"])
                 if isinstance(channel, unicode):
-                    channel = channel.encode("UTF-8")
+                    channel = self._encode(channel, channel)
                 self.msg(channel, text)
 
         if "users" in message and isinstance(message["users"], list):
             for user in message["users"]:
                 text = self._encode(user, message["text"])
                 if isinstance(user, unicode):
-                    user = user.encode("UTF-8")
+                    user = self._encode(user, user)
                 self.msg(user, text)
 
     @defer.inlineCallbacks
@@ -155,6 +155,8 @@ class IRCClient(irc.IRCClient):
             log.msg("user not match: " + user, level=DEBUG)
             return False
 
+        # use UTF-8 since regex in yaml are UTF-8
+        text = text.encode("UTF-8")
         if "match_text" in h and not h["match_text"].match(text):
             log.msg("text not match: " + text, level=DEBUG)
             return False
@@ -238,27 +240,27 @@ class IRCClient(irc.IRCClient):
 
             # redirect local messages
             reply = dict(channels=local_channels,
-                         text="%s@%s: %s" % (user, channel, text))
+                         text=u"%s@%s: %s" % (unicode(user), unicode(channel), text))
             d = defer.succeed(reply)
             d.addBoth(self._handled)
 
             # redirect remote messages
             for servername, channels in remote_channels.items():
                 reply = dict(channels=channels,
-                             text="%s@%s/%s: %s" % \
-                             (user, servername, channel, text))
+                             text=u"%s@%s/%s: %s" % \
+                             (unicode(user), unicode(servername), unicode(channel), text))
                 if servername in self.siblings:
                     p = self.siblings[servername].protocol
                     p.mq_append(reply)
                     p.schedule()
 
     def lineReceived(self, line):
-        log.msg(">> " + line, level=DEBUG)
+        log.msg(">> %s" % str(line), level=DEBUG)
         sys.stdout.flush()
         irc.IRCClient.lineReceived(self, line)
 
     def sendLine(self, line):
-        log.msg("<< " + line, level=DEBUG)
+        log.msg("<< %s" % str(line), level=DEBUG)
         irc.IRCClient.sendLine(self, line)
 
     ##########################################################################
