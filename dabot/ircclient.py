@@ -225,18 +225,23 @@ class IRCClient(irc.IRCClient):
             d.addBoth(self._handled)
 
         if "redirect" in h:
+            if user.index("!") > -1:
+                user = user.split("!")[0]
             items = map(lambda x: x.split("/", 2), h["redirect"])
             local_channels, remote_channels = list(), dict()
             for servername, rchannel in items:
+                log.msg("%s:%s/%s -> %s" % (servername, channel, user, rchannel), level=DEBUG)
                 if servername == self.servername:
+                    if rchannel == user:
+                        # rchannel != user prevents send the same message to
+                        # the sender
+                        continue
                     local_channels.append(rchannel)
                 elif servername in self.siblings:
                     if servername not in remote_channels:
                         remote_channels[servername] = [rchannel]
                     else:
                         remote_channels[servername].append(rchannel)
-
-            if user.index("!") > -1: user = user.split("!")[0]
 
             # redirect local messages
             reply = dict(channels=local_channels,
