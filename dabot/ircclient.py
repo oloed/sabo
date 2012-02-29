@@ -72,6 +72,7 @@ class IRCClient(irc.IRCClient):
             self.channels = setting["channels"]
             self.handlers = setting["handlers"]
             self.signedOn()
+            self.schedule()
         except Exception as e:
             raise ConfigError("malformed configuration: %s" % str(e))
 
@@ -143,15 +144,19 @@ class IRCClient(irc.IRCClient):
     def _match(self, h, servername, user, channel, text):
 
         if "match_server" in h and not h["match_server"].match(servername):
+            log.msg("server not match: " + servername, level=DEBUG)
             return False
 
         if "match_channel" in h and not h["match_channel"].match(channel):
+            log.msg("channel not match: " + channel, level=DEBUG)
             return False
 
         if "match_user" in h and not h["match_user"].match(user):
+            log.msg("user not match: " + user, level=DEBUG)
             return False
 
         if "match_text" in h and not h["match_text"].match(text):
+            log.msg("text not match: " + text, level=DEBUG)
             return False
 
         return True
