@@ -248,7 +248,7 @@ class IRCClient(irc.IRCClient):
             for servername, channels in remote_channels.items():
                 reply = dict(channels=channels,
                              text=u"%s@%s/%s: %s" % \
-                             (unicode(user), unicode(servername), unicode(channel), text))
+                             (unicode(user), unicode(self.servername), unicode(channel), text))
                 if servername in self.siblings:
                     p = self.siblings[servername].protocol
                     p.mq_append(reply)
