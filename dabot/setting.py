@@ -5,10 +5,10 @@ from twisted.python import log
 import re
 import codecs
 
-__all__ = ["setting", "reload", "init"]
+__all__ = ["setting", "reload_setting"]
 
-setting = None
-yaml = None
+setting, yaml = None, None
+
 
 class ConfigError(Exception):
     pass
@@ -21,21 +21,22 @@ def _compile_regex(v):
         return v
 
 
-def reload():
+def reload_setting():
     global setting
     log.msg("reloading configuration: %s" % yaml)
     setting = _init(yaml)
     return setting
 
+
 def init(_yaml):
-    return _init(_yaml)
+    global setting, yaml
+    yaml = _yaml
+    setting = _init(_yaml)
+    return setting
 
 
 def _init(_yaml):
-    global yaml
-
-    yaml = _yaml
-    _setting = None
+    _setting = dict()
 
     with codecs.open(yaml, "r", encoding="utf-8") as f:
         _setting = yaml_load(f.read())
@@ -83,6 +84,4 @@ def _init(_yaml):
     except Exception as e:
         raise ConfigError("malformed encoding configuration: %s" % str(e))
 
-    global setting
-    setting = _setting
     return _setting

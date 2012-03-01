@@ -65,8 +65,10 @@ class IRCClient(irc.IRCClient):
 
     def _reload(self):
         """reload reloadable settings :)"""
-        from dabot.setting import setting
+        from dabot.setting import reload_setting
         try:
+            setting = reload_setting()
+            print setting, "X" * 88
             self.server = setting["servers"][self.servername]
             self.encodings = setting["encodings"]
             self.default_encoding = setting["servers"].get("encoding", "UTF-8")
@@ -242,13 +244,20 @@ class IRCClient(irc.IRCClient):
     def _execute_builtin(self, h, user, channel, text):
         if h["builtin"] == "reload":
             users, channels = self._default_target(user, channel)
-            from dabot.setting import reload
+
             try:
-                reload()
                 self._reload()
+                num_handlers = reduce(lambda x, y: x + y,
+                                      map(lambda x: len(x),
+                                          self.handlers.values()))
+                status = "(%d servers, %d channels, %d handlers)" % \
+                    (len(self.siblings),
+                     len(self.channels),
+                     num_handlers)
                 return dict(users=users, channels=channels,
-                            text=["reloaded successfully"])
-            except:
+                            text=["reloaded successfully" + status])
+            except Exception as e:
+                log.msg(str(e))
                 return dict(users=users, channels=channels,
                             text=["failed!"])
         elif h["builtin"] == "more":
