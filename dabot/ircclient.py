@@ -39,9 +39,10 @@ class IRCClient(irc.IRCClient):
         try:
             self.servername = servername
             self.server = setting["servers"][self.servername]
+            self.lineRate = self.server.get("linerate", None)
             self.siblings = self.factory.siblings
             self.encodings = setting["encodings"]
-            self.default_encoding = setting["servers"].get("encoding", "UTF-8")
+            self.default_encoding = self.server.get("encoding", "UTF-8")
             self.nickname = setting["profile"]["nick"]
             self.realname = setting["profile"].get("real", "dabot")
             self.versionName = setting["profile"].get("version_name", "dabot")
@@ -68,9 +69,9 @@ class IRCClient(irc.IRCClient):
         from dabot.setting import reload_setting
         try:
             setting = reload_setting()
-            print setting, "X" * 88
             self.server = setting["servers"][self.servername]
             self.encodings = setting["encodings"]
+            self.lineRate = self.server.get("linerate", None)
             self.default_encoding = setting["servers"].get("encoding", "UTF-8")
             self.channels = setting["channels"]
             self.handlers = setting["handlers"]
@@ -250,10 +251,11 @@ class IRCClient(irc.IRCClient):
                 num_handlers = reduce(lambda x, y: x + y,
                                       map(lambda x: len(x),
                                           self.handlers.values()))
-                status = "(%d servers, %d channels, %d handlers)" % \
+                status = "(%d servers, %d channels, %d handlers, rate = %s)" % \
                     (len(self.siblings),
                      len(self.channels),
-                     num_handlers)
+                     num_handlers,
+                    str(self.lineRate))
                 return dict(users=users, channels=channels,
                             text=["reloaded successfully" + status])
             except Exception as e:
