@@ -59,15 +59,22 @@ class MessageService(BaseService):
             raise TypeError("input JSON must be a list")
 
         for message in messages:
-            if not isinstance(messages, list):
-                raise TypeError("item must be a dict")
-            message = dict(map(lambda v: (v[0].encode("UTF-8"), v[1]),
-                               message.items()))
-            if message["servername"] not in self.clients:
-                continue
 
-            self.clients[message["servername"]].protocol.mq_append(message)
-            self.clients[message["servername"]].protocol.schedule()
+            if not isinstance(message, dict):
+                raise TypeError("item must be a dict")
+            encode_message = dict(map(lambda v: (v[0].encode("UTF-8"), v[1]),
+                                      message.items()))
+
+            name = encode_message["servername"]
+            if name not in self.clients:
+                continue
+            encode_message["channels"] = map(lambda x: x.encode("UTF-8"),
+                                             encode_message["channels"])
+            encode_message["users"] = map(lambda x: x.encode("UTF-8"),
+                                          encode_message["users"])
+            print encode_message
+            self.clients[name].protocol.mq_append(encode_message)
+            self.clients[name].protocol.schedule()
 
     def render_POST(self, request):
         d = self.prepare(request)
