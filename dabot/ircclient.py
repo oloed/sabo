@@ -23,6 +23,7 @@ from logging import WARN, DEBUG
 import re
 import sys
 import time
+import traceback
 
 __all__ = ['IRCClient', 'IRCClientFactory', 'ConfigError']
 
@@ -51,12 +52,12 @@ class IRCClient(irc.IRCClient):
         except Exception as e:
             raise ConfigError("malformed configuration: %s" % str(e))
 
-        self.context = dict(setting=setting)
+        self.context = dict(
+            nickname=self.nickname,
+            servername=self.servername,
+            version="%s/%s" % (self.versionName, self.versionNum))
         self._mq = list()
-
-        # synchronous notification
-        # json = urllib.encode(setting)
-        # urllib2.urlopen(_api, json)
+        self._rq = dict()
 
     ##########################################################################
     # Basic Functions
@@ -98,6 +99,13 @@ class IRCClient(irc.IRCClient):
             return msg.decode(self._match_encoding(channel), "ignore")
 
     def _encode(self, channel, msg):
+        try:
+            return self.__encode(channel, msg)
+        except Exception:
+            print type(channel), type(msg), channel, msg, "X" * 88
+            raise
+
+    def __encode(self, channel, msg):
         index = (self.servername, channel)
         if index in self.channels:
             return msg.encode(self.channels[index]["encoding"], "ignore")
@@ -111,7 +119,6 @@ class IRCClient(irc.IRCClient):
 
         def __expand(m):
             name = m.group(1)
-            print name, "X" * 80
             if name in vars:
                 return vars[name]
             else:
@@ -126,32 +133,59 @@ class IRCClient(irc.IRCClient):
     def mq_append(self, data):
         log.msg("mq_append[%s]: %s" % (self.servername, str(data)),
                 level=DEBUG)
+        if not isinstance(data, dict):
+            self._complain("mq data is not dict:")
+            #traceback.print_stack()
+            return
         self._mq.append(data)
 
+    def rq_append(self, target, data):
+        log.msg("rq_append[%s]: %s" % (self.servername, str(data)),
+                level=DEBUG)
+        self._rq[target] = data
+
+    def rq_send(self, target):
+        if target not in self._rq:
+            return
+        message = dict(self._rq[target])
+        del self._rq[target]
+        self.mq_append(message)
+        self.schedule()
+
     def _send_text(self, message):
+        text = unicode(message["text"][0])
+        message["text"] = message["text"][1:]
+        nrest = len(message["text"])
+
+        if nrest > 0:
+            text += u" ...(%d more)" % nrest
+
         if "channels" in message and isinstance(message["channels"], list):
             for channel in message["channels"]:
-                text = self._encode(channel, message["text"])
-                if isinstance(channel, unicode):
-                    channel = self._encode(channel, channel)
-                self.msg(channel, text)
+                encode_text = self._encode(channel, text)
+                #if isinstance(channel, unicode):
+                #    channel = self._encode(channel, channel)
+                if nrest > 0:
+                    self.rq_append(channel, message)
+                self.msg(channel, encode_text)
 
         if "users" in message and isinstance(message["users"], list):
             for user in message["users"]:
-                text = self._encode(user, message["text"])
-                if isinstance(user, unicode):
-                    user = self._encode(user, user)
-                self.msg(user, text)
+                encode_text = self._encode(user, text)
+                #if isinstance(user, unicode):
+                #    user = self._encode(user, user)
+                if nrest > 0:
+                    self.rq_append(user, message)
+                self.msg(user, encode_text)
 
     def _send(self, message):
         if "text" in message:
             return self._send_text(message)
 
-    @defer.inlineCallbacks
     def schedule(self):
         while self._mq:
             message = self._mq.pop()
-            yield threads.deferToThread(self._send, message)
+            threads.deferToThread(self._send, message)
 
     ##########################################################################
     # handler infrastructure
@@ -179,16 +213,15 @@ class IRCClient(irc.IRCClient):
 
         return True
 
-    @defer.inlineCallbacks
     def _handled(self, value):
 
         if isinstance(value, Failure):
             self._complain(str(value.value))
             return
 
-        self.mq_append(value)
-        retval = yield self.schedule()
-        defer.returnValue(retval)
+        if value:
+            self.mq_append(value)
+            self.schedule()
 
     def _default_target(self, user, channel):
         if user.index("!") > -1:
@@ -214,16 +247,64 @@ class IRCClient(irc.IRCClient):
                 reload()
                 self._reload()
                 return dict(users=users, channels=channels,
-                            text="reloaded successfully")
+                            text=["reloaded successfully"])
             except:
                 return dict(users=users, channels=channels,
-                            text="failed!")
+                            text=["failed!"])
+        elif h["builtin"] == "more":
+            target = (channel, user)[channel == self.nickname]
+            self.rq_send(target)
+
+        return None
+
+    def _redirect(self, h, user, channel, text):
+        if user.index("!") > -1:
+            user = user.split("!")[0]
+        items = map(lambda x: x.split("/", 2), h["redirect"])
+        local_channels, remote_channels = list(), dict()
+        if "prefix" in h:
+            ctx = dict(user=user, channel=channel,
+                       servername=self.servername)
+            prefix = self._expandvar(h["prefix"], ctx)
+        else:
+            prefix = u"%s@%s/%s" % \
+              (unicode(user), unicode(self.servername), unicode(channel))
+        for servername, rchannel in items:
+            log.msg("%s:%s/%s -> %s" % \
+                    (servername, channel, user, rchannel), level=DEBUG)
+            if servername == self.servername:
+                if rchannel == user:
+                    # prevents send the same message to the sender
+                    continue
+                local_channels.append(rchannel)
+            elif servername in self.siblings:
+                if servername not in remote_channels:
+                    remote_channels[servername] = [rchannel]
+                else:
+                    remote_channels[servername].append(rchannel)
+
+        # redirect local messages
+        reply = dict(channels=local_channels,
+                     text=["%s: %s" % (prefix, text)])
+        d = defer.succeed(reply)
+        d.addBoth(self._handled)
+
+        # redirect remote messages
+        for servername, channels in remote_channels.items():
+            reply = dict(channels=channels,
+                         text=[u"%s: %s" % (prefix, text)])
+            if servername in self.siblings:
+                p = self.siblings[servername].protocol
+                p.mq_append(reply)
+                p.schedule()
 
     def _dispatch(self, h, user, channel, text=""):
 
         if "text" in h:
             users, channels = self._default_target(user, channel)
-            reply = dict(users=users, channels=channels, text=h["text"])
+            text = self._expandvar(h["text"], self.context)
+            reply = dict(users=users, channels=channels,
+                         text=text.splitlines())
             d = defer.succeed(reply)
             d.addBoth(self._handled)
 
@@ -241,41 +322,8 @@ class IRCClient(irc.IRCClient):
             d.addBoth(self._handled)
 
         if "redirect" in h:
-            if user.index("!") > -1:
-                user = user.split("!")[0]
-            items = map(lambda x: x.split("/", 2), h["redirect"])
-            local_channels, remote_channels = list(), dict()
-            if "prefix" in h:
-                ctx = dict(user=user, channel=channel,
-                           servername=self.servername)
-                prefix = self._expandvar(h["prefix"], ctx)
-            else:
-                prefix = u"%s@%s/%s" % (unicode(user), unicode(self.servername), unicode(channel))
-            for servername, rchannel in items:
-                log.msg("%s:%s/%s -> %s" % (servername, channel, user, rchannel), level=DEBUG)
-                if servername == self.servername:
-                    if rchannel == user:
-                        # prevents send the same message to the sender
-                        continue
-                    local_channels.append(rchannel)
-                elif servername in self.siblings:
-                    if servername not in remote_channels:
-                        remote_channels[servername] = [rchannel]
-                    else:
-                        remote_channels[servername].append(rchannel)
-
-            # redirect local messages
-            reply = dict(channels=local_channels, text="%s: %s" % (prefix,text))
-            d = defer.succeed(reply)
-            d.addBoth(self._handled)
-
-            # redirect remote messages
-            for servername, channels in remote_channels.items():
-                reply = dict(channels=channels, text=u"%s: %s" % (prefix, text))
-                if servername in self.siblings:
-                    p = self.siblings[servername].protocol
-                    p.mq_append(reply)
-                    p.schedule()
+            d = threads.deferToThread(self._redirect, h,
+                                      user, channel, text)
 
     def lineReceived(self, line):
         log.msg(">> %s" % str(line), level=DEBUG)
