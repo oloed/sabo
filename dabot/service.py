@@ -78,11 +78,12 @@ class MessageService(BaseService):
             name = encode_message["servername"]
             if name not in self.clients:
                 continue
-            encode_message["channels"] = map(lambda x: x.encode("UTF-8"),
-                                             encode_message["channels"])
-            encode_message["users"] = map(lambda x: x.encode("UTF-8"),
-                                          encode_message["users"])
-            print encode_message
+            if "channels" in encode_message:
+                encode_message["channels"] = map(lambda x: x.encode("UTF-8"),
+                                                 encode_message["channels"])
+            if "users" in encode_message:
+                encode_message["users"] = map(lambda x: x.encode("UTF-8"),
+                                              encode_message["users"])
             self.clients[name].protocol.mq_append(encode_message)
             self.clients[name].protocol.schedule()
 
