@@ -1,3 +1,13 @@
+"""
+
+MQ Data:
+
+All keys must be UTF-8 string of <type 'str'>
+All values except 'text' must be UTF-8 string of <type 'str'>
+'text' content must be unicode
+
+"""
+
 from twisted.web.resource import Resource
 from twisted.python.failure import Failure
 from twisted.python import log

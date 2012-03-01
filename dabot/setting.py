@@ -1,13 +1,4 @@
 # -*- mode: python -*-
-"""
-
-Goals:
-
-   1. independent development mode
-   2. restart without quit
-
-"""
-
 
 from yaml import load as yaml_load
 from twisted.python import log
