@@ -143,11 +143,12 @@ class IRCClient(irc.IRCClient):
         self._mq.append(data)
 
     def rq_append(self, target, data):
-        log.msg("rq_append[%s]: %s" % (self.servername, str(data)),
+        log.msg("rq_append[%s@%s]: %s" % (target, self.servername, str(data)),
                 level=DEBUG)
         self._rq[target] = data
 
     def rq_send(self, target):
+        log.msg("rq_send[%s]" % target, level=DEBUG)
         if target not in self._rq:
             return
         message = dict(self._rq[target])
@@ -227,9 +228,6 @@ class IRCClient(irc.IRCClient):
             self.schedule()
 
     def _default_target(self, user, channel):
-        if user.index("!") > -1:
-            user = user.split("!")[0]
-
         if channel == self.nickname:
             return ([user], [])
         else:
@@ -269,8 +267,6 @@ class IRCClient(irc.IRCClient):
         return None
 
     def _redirect(self, h, user, channel, text):
-        if user.index("!") > -1:
-            user = user.split("!")[0]
         items = map(lambda x: x.split("/", 2), h["redirect"])
         local_channels, remote_channels = list(), dict()
         if "prefix" in h:
@@ -361,6 +357,10 @@ class IRCClient(irc.IRCClient):
 
     def _privmsg(self, user, channel, msg):
         text = self._decode(channel, msg)
+
+        # get real username
+        if user.index("!") > -1:
+            user = user.split("!")[0]
 
         def __match(h):
             return self._match(h, self.servername, user, channel, text)
