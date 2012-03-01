@@ -20,16 +20,16 @@ from dabot.setting import ConfigError
 from cjson import encode as json_encode, decode as json_decode
 from logging import WARN, DEBUG
 
-import os
+import re
 import sys
 import time
-import urllib
-import urllib2  # for synchronous notification on startup
 
 __all__ = ['IRCClient', 'IRCClientFactory', 'ConfigError']
 
 
 class IRCClient(irc.IRCClient):
+
+    EXPAND_RE = re.compile("%{(\w+)}")
 
     def __init__(self, factory, servername):
         from dabot.setting import setting
@@ -107,6 +107,18 @@ class IRCClient(irc.IRCClient):
     def _complain(self, err):
         log.msg(str(err), level=WARN)
 
+    def _expandvar(self, text, vars):
+
+        def __expand(m):
+            name = m.group(1)
+            print name, "X" * 80
+            if name in vars:
+                return vars[name]
+            else:
+                return m.group(0)
+
+        return self.EXPAND_RE.subn(__expand, text)[0]
+
     ##########################################################################
     # Message Queue Manipulation
     ##########################################################################
@@ -116,7 +128,7 @@ class IRCClient(irc.IRCClient):
                 level=DEBUG)
         self._mq.append(data)
 
-    def _send(self, message):
+    def _send_text(self, message):
         if "channels" in message and isinstance(message["channels"], list):
             for channel in message["channels"]:
                 text = self._encode(channel, message["text"])
@@ -130,6 +142,10 @@ class IRCClient(irc.IRCClient):
                 if isinstance(user, unicode):
                     user = self._encode(user, user)
                 self.msg(user, text)
+
+    def _send(self, message):
+        if "text" in message:
+            return self._send_text(message)
 
     @defer.inlineCallbacks
     def schedule(self):
@@ -229,12 +245,17 @@ class IRCClient(irc.IRCClient):
                 user = user.split("!")[0]
             items = map(lambda x: x.split("/", 2), h["redirect"])
             local_channels, remote_channels = list(), dict()
+            if "prefix" in h:
+                ctx = dict(user=user, channel=channel,
+                           servername=self.servername)
+                prefix = self._expandvar(h["prefix"], ctx)
+            else:
+                prefix = u"%s@%s/%s" % (unicode(user), unicode(self.servername), unicode(channel))
             for servername, rchannel in items:
                 log.msg("%s:%s/%s -> %s" % (servername, channel, user, rchannel), level=DEBUG)
                 if servername == self.servername:
                     if rchannel == user:
-                        # rchannel != user prevents send the same message to
-                        # the sender
+                        # prevents send the same message to the sender
                         continue
                     local_channels.append(rchannel)
                 elif servername in self.siblings:
@@ -244,16 +265,13 @@ class IRCClient(irc.IRCClient):
                         remote_channels[servername].append(rchannel)
 
             # redirect local messages
-            reply = dict(channels=local_channels,
-                         text=u"%s@%s: %s" % (unicode(user), unicode(channel), text))
+            reply = dict(channels=local_channels, text="%s: %s" % (prefix,text))
             d = defer.succeed(reply)
             d.addBoth(self._handled)
 
             # redirect remote messages
             for servername, channels in remote_channels.items():
-                reply = dict(channels=channels,
-                             text=u"%s@%s/%s: %s" % \
-                             (unicode(user), unicode(self.servername), unicode(channel), text))
+                reply = dict(channels=channels, text=u"%s: %s" % (prefix, text))
                 if servername in self.siblings:
                     p = self.siblings[servername].protocol
                     p.mq_append(reply)
