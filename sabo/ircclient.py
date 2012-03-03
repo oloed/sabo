@@ -62,6 +62,7 @@ class IRCClient(irc.IRCClient):
             version="%s/%s" % (self.versionName, self.versionNum))
         self._mq = list()
         self._rq = dict()
+        self._users = dict()
 
     ##########################################################################
     # Basic Functions
@@ -380,12 +381,18 @@ class IRCClient(irc.IRCClient):
         def __match(h):
             return self._match(h, self.servername, user, channel, "")
 
+        self._users[channel][user] = dict()
+        log.msg("users = %s" % self._users, level=DEBUG)
         for h in filter(__match, self.handlers["user_joined"]):
             self._dispatch(h, user, channel)
 
     def userJoined(self, user, channel):
         d = threads.deferToThread(self._userJoined, user, channel)
         d.addErrback(self._complain)
+
+    def userLeft(self, user, channel):
+        del self._users[channel][user]
+        log.msg("users = %s" % self._users, level=DEBUG)
 
     def _joined(self, channel):
         servername = self.servername
@@ -405,16 +412,23 @@ class IRCClient(irc.IRCClient):
     def joined(self, channel):
         d = threads.deferToThread(self._joined, channel)
         d.addErrback(self._complain)
-"""
+
+    def userRenamed(self, oldname, newname):
+        log.msg("rename %s -> %s" % (oldname, newname), level=DEBUG)
+        for channel in self._users:
+            self._users[channel][newname] = self._users[channel][oldname]
+            del self._users[channel][oldname]
+            log.msg("users = %s" % self._users, level=DEBUG)
+
     def irc_RPL_NAMREPLY(self, prefix, params):
-        irc.IRCClient.irc_RPL_NAMEREPLY(self, prefix, params)
+        channel = params[2].lower()
+        nicklist = filter(lambda x: x, params[3].split(' '))
+        # remove op character
+        nicklist = map(lambda x: x.lstrip("@"), nicklist)
+        self._users[channel] = dict(map(lambda x: (x, dict()), nicklist))
 
     def irc_RPL_ENDOFNAMES(self, prefix, params):
-        irc.IRCClient.irc_ENDOFNAMES(self, prefix, params)
-
-    def irc_NICK(self, prefix, params):
-        irc.IRCClient.irc_NICK(self, prefix, params)
-"""
+        log.msg("users = %s" % self._users, level=DEBUG)
 
 
 class IRCClientFactory(protocol.ClientFactory):

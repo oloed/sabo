@@ -63,7 +63,7 @@ def _init(_yaml):
     # rearrange handlers' data structure
     try:
         h = dict(privmsg=list(), user_joined=list(), joined=list())
-        for item in list(yaml_load(_setting["handlers"])):
+        for item in list(yaml_load(_setting["handlers"])) or []:
             if item["type"] in h:
                 data = dict(map(_compile_regex, item.items()))
                 h[item["type"]].append(data)
@@ -77,7 +77,7 @@ def _init(_yaml):
     # rearrange handlers' data structure
     try:
         encodings = list()
-        for item in yaml_load(_setting["encodings"]):
+        for item in yaml_load(_setting["encodings"]) or []:
             data = dict(map(_compile_regex, item.items()))
             encodings.append(data)
         _setting["encodings"] = encodings
