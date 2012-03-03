@@ -8,7 +8,6 @@ URL_RE = re.compile("http://[a-zA-Z0-9.]+")
 
 @defer.inlineCallbacks
 def tinyurl(text):
-    print "X" * 80
     API = "http://tinyurl.com/api-create.php?"
     start = 0
     retval = ""
@@ -18,6 +17,8 @@ def tinyurl(text):
       tiny = yield getPage(API + param)
       retval += tiny
       start = match.end()
+    if len(retval) == 0:
+	retval = text
     defer.returnValue(retval)
 """
 @defer.inlineCallbacks

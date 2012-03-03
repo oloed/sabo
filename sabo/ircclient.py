@@ -55,6 +55,12 @@ class IRCClient(irc.IRCClient):
             self.password = self.server.get("password", None)
             self.channels = setting["channels"]
             self.handlers = setting["handlers"]
+
+            if "ignore_target" in self.server:
+                self.ignore_target = re.compile(self.server["ignore_target"])
+            else:
+                self.ignore_target = None
+
         except Exception as e:
             raise ConfigError("malformed configuration: %s" % str(e))
 
@@ -188,6 +194,8 @@ class IRCClient(irc.IRCClient):
                 encode_text = self._encode(channel, text)
                 if nrest > 0:
                     self.rq_append(channel, message)
+                if self.ignore_target and self.ignore_target.match(channel):
+                    continue
                 self.msg(channel, encode_text)
 
         if "users" in message and isinstance(message["users"], list):
@@ -201,6 +209,8 @@ class IRCClient(irc.IRCClient):
                 encode_text = self._encode(user, text)
                 if nrest > 0:
                     self.rq_append(user, message)
+                if self.ignore_target and self.ignore_target.match(user):
+                    continue
                 self.msg(user, encode_text)
 
     def _send(self, message):
@@ -363,7 +373,7 @@ class IRCClient(irc.IRCClient):
             d = defer.succeed(text)
             if "filters" in h:
                 for filter in h["filters"]:
-                    if filter == 'tiny_url':
+                    if filter == 'tinyurl':
                         d.addCallback(filters.tinyurl)
             d.addBoth(lambda x: threads.deferToThread(self._redirect, x, h,
                                                       user, channel, text))
