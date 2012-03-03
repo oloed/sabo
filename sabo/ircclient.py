@@ -170,18 +170,33 @@ class IRCClient(irc.IRCClient):
 
         if "channels" in message and isinstance(message["channels"], list):
             for channel in message["channels"]:
+
+                # skip same duplicates
+                if ("from_channel" in message
+                    and message["from_channel"] == channel):
+                    continue
+
+                if channel.endswith("*"):
+                    if not "users" in message:
+                        message["users"] = list()
+                    expanded_users = self._users[channel.rstrip("*")].keys()
+                    message["users"].extend(expanded_users)
+                    continue
+
                 encode_text = self._encode(channel, text)
-                #if isinstance(channel, unicode):
-                #    channel = self._encode(channel, channel)
                 if nrest > 0:
                     self.rq_append(channel, message)
                 self.msg(channel, encode_text)
 
         if "users" in message and isinstance(message["users"], list):
             for user in message["users"]:
+
+                # skip same duplicates
+                if ("from_user" in message
+                    and message["from_user"] == user):
+                    continue
+
                 encode_text = self._encode(user, text)
-                #if isinstance(user, unicode):
-                #    user = self._encode(user, user)
                 if nrest > 0:
                     self.rq_append(user, message)
                 self.msg(user, encode_text)
@@ -202,23 +217,28 @@ class IRCClient(irc.IRCClient):
     def _match(self, h, servername, user, channel, text):
 
         if "match_server" in h and not h["match_server"].match(servername):
-            log.msg("server not match: " + servername, level=DEBUG)
+            log.msg("match server `%s' with `%s' failed " % \
+                (h["match_server"].pattern, servername), level=DEBUG)
             return False
 
         if "match_channel" in h and not h["match_channel"].match(channel):
-            log.msg("channel not match: " + channel, level=DEBUG)
+            log.msg("match channel `%s' with `%s' failed " % \
+                (h["match_channel"].pattern, channel), level=DEBUG)
             return False
 
         if "match_user" in h and not h["match_user"].match(user):
-            log.msg("user not match: " + user, level=DEBUG)
+            log.msg("match user `%s' with `%s' failed " % \
+                (h["match_user"].pattern, user), level=DEBUG)
             return False
 
         # use UTF-8 since regex in yaml are UTF-8
         text = text.encode("UTF-8")
         if "match_text" in h and not h["match_text"].match(text):
-            log.msg("text not match: " + text, level=DEBUG)
+            log.msg("match text `%s' with `%s' failed " % \
+                (h["match_text"].pattern, text), level=DEBUG)
             return False
 
+        log.msg("text matched: %s" % str(h))
         return True
 
     def _handled(self, value):
@@ -273,6 +293,9 @@ class IRCClient(irc.IRCClient):
     def _redirect(self, h, user, channel, text):
         items = map(lambda x: x.split("/", 2), h["redirect"])
         local_channels, remote_channels = list(), dict()
+
+        print "X" * 80, items
+
         if "prefix" in h:
             ctx = dict(user=user, channel=channel,
                        servername=self.servername)
@@ -280,13 +303,11 @@ class IRCClient(irc.IRCClient):
         else:
             prefix = u"%s@%s/%s" % \
               (unicode(user), unicode(self.servername), unicode(channel))
+
         for servername, rchannel in items:
             log.msg("%s:%s/%s -> %s" % \
                     (servername, channel, user, rchannel), level=DEBUG)
             if servername == self.servername:
-                if rchannel == user:
-                    # prevents send the same message to the sender
-                    continue
                 local_channels.append(rchannel)
             elif servername in self.siblings:
                 if servername not in remote_channels:
@@ -295,10 +316,12 @@ class IRCClient(irc.IRCClient):
                     remote_channels[servername].append(rchannel)
 
         # redirect local messages
-        reply = dict(channels=local_channels,
-                     text=["%s: %s" % (prefix, text)])
-        d = defer.succeed(reply)
-        d.addBoth(self._handled)
+        if local_channels:
+            reply = dict(from_user=user, from_channel=channel,
+                         channels=local_channels,
+                         text=["%s: %s" % (prefix, text)])
+            d = defer.succeed(reply)
+            d.addBoth(self._handled)
 
         # redirect remote messages
         for servername, channels in remote_channels.items():
