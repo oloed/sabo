@@ -17,7 +17,7 @@ from twisted.web.client import getPage
 from twisted.python.failure import Failure
 from twisted.python import log
 from sabo.setting import ConfigError
-from cjson import encode as json_encode, decode as json_decode
+from ujson import encode as json_encode, decode as json_decode
 from logging import WARN, DEBUG
 
 import re
