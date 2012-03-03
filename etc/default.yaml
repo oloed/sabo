@@ -1,0 +1,113 @@
+---
+profile:
+  name: Jianing YANG
+
+controller:
+  host: 127.0.0.1
+  port: 55555
+
+servers: >
+  -
+    name: freenode
+    nick: sabo
+    host: irc.freenode.net
+    port: 6667
+    encoding: utf-8
+
+  -
+    name: bitlbee001
+    nick: sabo001
+    host: im.bitlbee.org
+    port: 6667
+    encoding: utf-8
+    ignore_target: "^(root|sabo\\d+)$"
+
+channels: >
+  -
+    server: freenode
+    name: '#sabo'
+    encoding: utf-8
+
+handlers: >
+
+  -
+    match_server: '^freenode$'
+    match_channel: '^sabo$'
+    match_text: '^!reload'
+    type: privmsg
+    builtin: reload
+
+  -
+    match_server: '^bitlbee\d+$'
+    match_channel: '^sabo\d+$'
+    match_text: '^!reload'
+    type: privmsg
+    builtin: reload
+
+  -
+    match_text: '^!more$'
+    type: privmsg
+    builtin: more
+
+  -
+    match_text: '^!whoami$'
+    type: privmsg
+    text: >
+      我是 %{nickname}。我工作的服务器是: %{servername}。我的版本是 %{version} 。我的代码在 http://github.com/jianingy/sabo 。
+
+  -
+    match_text: '^!joke$'
+    type: privmsg
+    text: >
+      没有笑话！
+
+  -
+    match_text: '^!help$'
+    type: privmsg
+    text: >
+      !time 看时间 || !more 翻页  || !whoami 版本信息
+
+  -
+    match_text: '^!time'
+    type: privmsg
+    http: http://localhost:8080/time.rpy
+
+  -
+    match_text: '^!nick'
+    type: privmsg
+    http: http://localhost:8080/rename.rpy
+
+  -
+    match_server: '^bitlbee001$'
+    match_channel: '&bitlbee'
+    match_text: '.* identify yourself\.'
+    type: privmsg
+    text: 'identify 123456'
+
+  -
+    match_server: '^bitlbee\d+$'
+    match_channel: '^sabo'
+    match_text: '.(?<!!).+|[^!]'
+    type: privmsg
+    prefix: '<%{user}>'
+    filters:
+      - tinyurl
+    redirect:
+      - "freenode/#sabo"
+      - "bitlbee001/&bitlbee*"
+
+  -
+    match_server: '^freenode'
+    match_channel: '^#sabo'
+    match_text: '.(?<!!).+|[^!]'
+    type: privmsg
+    prefix: '[%{user}]'
+    filters:
+      - tinyurl
+    redirect: 
+      - "bitlbee001/&bitlbee*"
+
+encodings: >
+
+
+# vim: ts=2 sw=2 ai et
