@@ -3,7 +3,7 @@ from sabo.ircclient import IRCClientFactory
 from sabo.service import MessageService
 from twisted.web import resource, server
 from twisted.internet import reactor
-
+from twisted.python import log
 
 def start(yaml):
     init_setting(yaml)
@@ -14,6 +14,7 @@ def start(yaml):
     siblings = dict()
     for name in setting["servers"].keys():
         siblings[name] = f = IRCClientFactory(name, siblings)
+        log.msg("Connecting to %s:%s" % (f.host, f.port))
         reactor.connectTCP(f.host, f.port, f)
 
     # setup controlling server
@@ -21,5 +22,5 @@ def start(yaml):
     root.putChild("message", MessageService(siblings))
     site = server.Site(root)
 
-    reactor.listenTCP(setting["backend"]["port"], site)
+    reactor.listenTCP(setting["controller"]["port"], site)
     reactor.run()

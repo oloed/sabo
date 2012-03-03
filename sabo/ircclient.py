@@ -32,6 +32,11 @@ class IRCClient(irc.IRCClient):
 
     EXPAND_RE = re.compile("%{(\w+)}")
 
+    nickmame = "sabo"
+    realname = "Robert Sabo"
+    versionName = "sabo"
+    versionNum = "0.2"
+
     def __init__(self, factory, servername):
         from sabo.setting import setting
         self.factory = factory
@@ -43,11 +48,9 @@ class IRCClient(irc.IRCClient):
             self.siblings = self.factory.siblings
             self.encodings = setting["encodings"]
             self.default_encoding = self.server.get("encoding", "UTF-8")
-            self.nickname = setting["profile"]["nick"]
-            self.realname = setting["profile"].get("real", "sabo")
-            self.versionName = setting["profile"].get("version_name", "sabo")
-            self.versionNum = setting["profile"].get("version_num", "1.0")
-            self.password = setting["profile"].get("password", None)
+            self.realname = setting["profile"].get("realname", self.realname)
+            self.nickname = self.server.get("nick", self.nickname)
+            self.password = self.server.get("password", None)
             self.channels = setting["channels"]
             self.handlers = setting["handlers"]
         except Exception as e:
@@ -446,3 +449,5 @@ class IRCClientFactory(protocol.ClientFactory):
     def clientConnectFailed(self, connector, reason):
         log.msg("connection failed:" + reason, level=WARN)
         self.reconnect(connector, reason)
+
+# vim: ts=4 sw=4 ai et
