@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from dabot import start
+from sabo import start
 from twisted.python import log
 import sys
 
