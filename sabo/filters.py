@@ -4,7 +4,7 @@ from twisted.web.client import getPage
 import urllib
 import re
 
-URL_RE = re.compile("https?://[a-zA-Z0-9.@&=%+/-]+")
+URL_RE = re.compile("https?://[a-zA-Z0-9.@&=%+/:-]+")
 
 @defer.inlineCallbacks
 def tinyurl(text):
