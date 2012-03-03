@@ -17,8 +17,10 @@ from twisted.web.client import getPage
 from twisted.python.failure import Failure
 from twisted.python import log
 from sabo.setting import ConfigError
+from sabo import filters
 from ujson import encode as json_encode, decode as json_decode
 from logging import WARN, DEBUG
+
 
 import re
 import sys
@@ -290,11 +292,13 @@ class IRCClient(irc.IRCClient):
 
         return None
 
-    def _redirect(self, h, user, channel, text):
+    def _redirect(self, value, h, user, channel, text):
+        if isinstance(value, Failure):
+            log.msg(value.printTraceback())
+        else:
+            text = value
         items = map(lambda x: x.split("/", 2), h["redirect"])
         local_channels, remote_channels = list(), dict()
-
-        print "X" * 80, items
 
         if "prefix" in h:
             ctx = dict(user=user, channel=channel,
@@ -356,8 +360,13 @@ class IRCClient(irc.IRCClient):
             d.addBoth(self._handled)
 
         if "redirect" in h:
-            d = threads.deferToThread(self._redirect, h,
-                                      user, channel, text)
+            d = defer.succeed(text)
+            if "filters" in h:
+                for filter in h["filters"]:
+                    if filter == 'tiny_url':
+                        d.addCallback(filters.tinyurl)
+            d.addBoth(lambda x: threads.deferToThread(self._redirect, x, h,
+                                                      user, channel, text))
 
     def lineReceived(self, line):
         log.msg(">> %s" % str(line), level=DEBUG)
