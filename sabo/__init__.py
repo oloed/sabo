@@ -1,6 +1,6 @@
-from dabot.setting import init as init_setting
-from dabot.ircclient import IRCClientFactory
-from dabot.service import MessageService
+from sabo.setting import init as init_setting
+from sabo.ircclient import IRCClientFactory
+from sabo.service import MessageService
 from twisted.web import resource, server
 from twisted.internet import reactor
 
@@ -8,7 +8,7 @@ from twisted.internet import reactor
 def start(yaml):
     init_setting(yaml)
 
-    from dabot.setting import setting
+    from sabo.setting import setting
 
     # setup clients
     siblings = dict()

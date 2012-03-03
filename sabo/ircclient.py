@@ -16,7 +16,7 @@ from twisted.words.protocols import irc
 from twisted.web.client import getPage
 from twisted.python.failure import Failure
 from twisted.python import log
-from dabot.setting import ConfigError
+from sabo.setting import ConfigError
 from cjson import encode as json_encode, decode as json_decode
 from logging import WARN, DEBUG
 
@@ -33,7 +33,7 @@ class IRCClient(irc.IRCClient):
     EXPAND_RE = re.compile("%{(\w+)}")
 
     def __init__(self, factory, servername):
-        from dabot.setting import setting
+        from sabo.setting import setting
         self.factory = factory
         log.msg("IRCClient initialized", level=DEBUG)
         try:
@@ -44,8 +44,8 @@ class IRCClient(irc.IRCClient):
             self.encodings = setting["encodings"]
             self.default_encoding = self.server.get("encoding", "UTF-8")
             self.nickname = setting["profile"]["nick"]
-            self.realname = setting["profile"].get("real", "dabot")
-            self.versionName = setting["profile"].get("version_name", "dabot")
+            self.realname = setting["profile"].get("real", "sabo")
+            self.versionName = setting["profile"].get("version_name", "sabo")
             self.versionNum = setting["profile"].get("version_num", "1.0")
             self.password = setting["profile"].get("password", None)
             self.channels = setting["channels"]
@@ -66,7 +66,7 @@ class IRCClient(irc.IRCClient):
 
     def _reload(self):
         """reload reloadable settings :)"""
-        from dabot.setting import reload_setting
+        from sabo.setting import reload_setting
         try:
             setting = reload_setting()
             self.server = setting["servers"][self.servername]
@@ -422,7 +422,7 @@ class IRCClientFactory(protocol.ClientFactory):
         return self.protocol
 
     def __init__(self, servername, siblings):
-        from dabot.setting import setting
+        from sabo.setting import setting
         self.servername = servername
         self.siblings = siblings
         server = setting["servers"][self.servername]
