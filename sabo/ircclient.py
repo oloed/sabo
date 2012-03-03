@@ -16,6 +16,7 @@ from twisted.words.protocols import irc
 from twisted.web.client import getPage
 from twisted.python.failure import Failure
 from twisted.python import log
+from sabo.util import fix_message_encoding
 from sabo.setting import ConfigError
 from sabo import filters
 from ujson import encode as json_encode, decode as json_decode
@@ -259,7 +260,14 @@ class IRCClient(irc.IRCClient):
             self._complain(str(value.value))
             return
 
-        if value:
+        if not value:
+            return
+
+        if "servername" in value and value["servername"] != self.servername:
+            p = self.siblings[servername].protocol
+            p.mq_append(value)
+            p.schedule()
+        else:
             self.mq_append(value)
             self.schedule()
 
@@ -270,7 +278,7 @@ class IRCClient(irc.IRCClient):
             return ([], [channel])
 
     def _http_done(self, message, user, channel):
-        message = json_decode(message)
+        message = fix_message_encoding(json_decode(message))
         if "users" not in message and "channels" not in message:
             message["users"], message["channels"] = \
               self._default_target(user, channel)
@@ -357,7 +365,8 @@ class IRCClient(irc.IRCClient):
             d.addBoth(self._handled)
 
         if "http" in h:
-            postdata = json_encode(dict(user=user,
+            postdata = json_encode(dict(servername=self.servername,
+                                        user=user,
                                         channel=channel,
                                         text=text))
             d = getPage(h["http"], method="POST", postdata=postdata)

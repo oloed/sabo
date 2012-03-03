@@ -15,6 +15,7 @@ from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
 from logging import DEBUG
 from ujson import decode as json_decode, encode as json_encode
+from sabo.util import fix_message_encoding
 
 import time
 
@@ -72,20 +73,14 @@ class MessageService(BaseService):
 
             if not isinstance(message, dict):
                 raise TypeError("item must be a dict")
-            encode_message = dict(map(lambda v: (v[0].encode("UTF-8"), v[1]),
-                                      message.items()))
-
-            name = encode_message["servername"]
-            if name not in self.clients:
-                continue
-            if "channels" in encode_message:
-                encode_message["channels"] = map(lambda x: x.encode("UTF-8"),
-                                                 encode_message["channels"])
-            if "users" in encode_message:
-                encode_message["users"] = map(lambda x: x.encode("UTF-8"),
-                                              encode_message["users"])
-            self.clients[name].protocol.mq_append(encode_message)
-            self.clients[name].protocol.schedule()
+            encoded_message = fix_message_encoding(message)
+            if not "servername" in encoded_message:
+                raise TypeError("servername not found")
+	    servername = encoded_message["servername"]
+	    if servername not in self.clients:
+		continue
+            self.clients[servername].protocol.mq_append(encoded_message)
+            self.clients[servername].protocol.schedule()
 
     def render_POST(self, request):
         d = self.prepare(request)
