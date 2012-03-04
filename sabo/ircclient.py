@@ -11,7 +11,7 @@ return value format:
 }
 """
 
-from twisted.internet import reactor, protocol, threads, defer
+from twisted.internet import protocol, threads, defer
 from twisted.words.protocols import irc
 from twisted.web.client import getPage
 from twisted.python.failure import Failure
@@ -27,7 +27,6 @@ import re
 import sys
 import time
 import random
-import traceback
 
 __all__ = ['IRCClient', 'IRCClientFactory', 'ConfigError']
 
