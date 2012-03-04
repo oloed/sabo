@@ -11,22 +11,22 @@ return value format:
 }
 """
 
-from twisted.internet import protocol, threads, defer
+from twisted.internet import reactor, protocol, threads, defer
 from twisted.words.protocols import irc
 from twisted.web.client import getPage
 from twisted.python.failure import Failure
 from twisted.python import log
 from sabo.util import fix_message_encoding
 from sabo.setting import ConfigError
-from sabo import filters
 from ujson import encode as json_encode, decode as json_decode
 from logging import WARN, DEBUG
-
+import sabo.filters
 
 import re
 import sys
 import time
 import random
+import traceback
 
 __all__ = ['IRCClient', 'IRCClientFactory', 'ConfigError']
 
@@ -83,6 +83,7 @@ class IRCClient(irc.IRCClient):
         from sabo.setting import reload_setting
         try:
             setting = reload_setting()
+            reload(sabo.filters)
             self.server = setting["servers"][self.servername]
             self.encodings = setting["encodings"]
             self.lineRate = self.server.get("linerate", None)
@@ -344,14 +345,14 @@ class IRCClient(irc.IRCClient):
         if local_channels:
             reply = dict(from_user=user, from_channel=channel,
                          channels=local_channels,
-                         text=["%s: %s" % (prefix, text)])
+                         text=["%s%s" % (prefix, text)])
             d = defer.succeed(reply)
             d.addBoth(self._handled)
 
         # redirect remote messages
         for servername, channels in remote_channels.items():
             reply = dict(channels=channels,
-                         text=[u"%s: %s" % (prefix, text)])
+                         text=[u"%s%s" % (prefix, text)])
             if servername in self.siblings:
                 p = self.siblings[servername].protocol
                 p.mq_append(reply)
@@ -386,7 +387,7 @@ class IRCClient(irc.IRCClient):
             if "filters" in h:
                 for filter in h["filters"]:
                     if filter == 'tinyurl':
-                        d.addCallback(filters.tinyurl)
+                        d.addCallback(sabo.filters.tinyurl)
             d.addBoth(lambda x: threads.deferToThread(self._redirect, x, h,
                                                       user, channel, text))
 
