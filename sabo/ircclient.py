@@ -45,7 +45,7 @@ class IRCClient(irc.IRCClient):
         from sabo.setting import setting
         self.factory = factory
         log.msg("IRCClient initialized", level=DEBUG)
-		random.seed(time.time())
+        random.seed(time.time())
         try:
             self.servername = servername
             self.server = setting["servers"][self.servername]
