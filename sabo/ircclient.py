@@ -180,7 +180,8 @@ class IRCClient(irc.IRCClient):
             text += u" ...(%d more)" % nrest
 
         if "channels" in message and isinstance(message["channels"], list):
-            for channel in random.shuffle(message["channels"]):
+            random.shuffle(message["channels"])
+            for channel in message["channels"]:
 
                 # skip same duplicates
                 if ("from_channel" in message
@@ -202,7 +203,8 @@ class IRCClient(irc.IRCClient):
                 self.msg(channel, encode_text)
 
         if "users" in message and isinstance(message["users"], list):
-            for user in random.shuffle(message["users"]):
+            random.shuffle(message["users"])
+            for user in message["users"]:
 
                 # skip same duplicates
                 if ("from_user" in message
