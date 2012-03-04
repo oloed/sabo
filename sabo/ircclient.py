@@ -26,6 +26,7 @@ from logging import WARN, DEBUG
 import re
 import sys
 import time
+import random
 import traceback
 
 __all__ = ['IRCClient', 'IRCClientFactory', 'ConfigError']
@@ -44,6 +45,7 @@ class IRCClient(irc.IRCClient):
         from sabo.setting import setting
         self.factory = factory
         log.msg("IRCClient initialized", level=DEBUG)
+		random.seed(time.time())
         try:
             self.servername = servername
             self.server = setting["servers"][self.servername]
@@ -178,7 +180,7 @@ class IRCClient(irc.IRCClient):
             text += u" ...(%d more)" % nrest
 
         if "channels" in message and isinstance(message["channels"], list):
-            for channel in message["channels"]:
+            for channel in random.shuffle(message["channels"]):
 
                 # skip same duplicates
                 if ("from_channel" in message
@@ -200,7 +202,7 @@ class IRCClient(irc.IRCClient):
                 self.msg(channel, encode_text)
 
         if "users" in message and isinstance(message["users"], list):
-            for user in message["users"]:
+            for user in random.shuffle(message["users"]):
 
                 # skip same duplicates
                 if ("from_user" in message
