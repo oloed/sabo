@@ -402,7 +402,7 @@ class IRCClient(irc.IRCClient):
 
         if "redirect" in h:
             d = self._redirect_rewrite(h, text)
-            d.addBoth(self._redirect, h, user, channel, text)
+            d.addBoth(lambda x: threads.deferToThread(self._redirect, x, h, user, channel, text))
 
     def lineReceived(self, line):
         log.msg(">> %s" % str(line), level=DEBUG)
