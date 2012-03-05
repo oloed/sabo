@@ -26,6 +26,7 @@ channels:
   -
     server: freenode
     name: '#sabo'
+    password: 'xxx'
     encoding: utf-8
 
   -
@@ -95,10 +96,8 @@ handlers:
     match_text: '.(?<!!).*'
     type: privmsg
     prefix: '<%{user}>: '
-    filters:
-      -
-        tinyurl: aaaa
-        http: xxx
+    rewrites:
+      - http: http://localhost:8080/tinyurl.rpy
 
     redirect:
       - "freenode/#sabo"
@@ -109,9 +108,16 @@ handlers:
     match_channel: '^#sabo'
     match_text: '.(?<!!).*'
     type: privmsg
-    prefix: '[%{user}]: '
-    filters:
-      - tinyurl
+    prefix: ''
+    rewrites:
+      -
+        match_text: 'sabo'
+        text: awesome
+
+      -
+        match_text: 'https?://[a-zA-Z0-9.@&=%+/:?-]+'
+        http: http://localhost:8080/tinyurl.rpy
+
     redirect:
       - "bitlbee001/&bitlbee*"
 
