@@ -20,7 +20,6 @@ from sabo.util import fix_message_encoding
 from sabo.setting import ConfigError
 from ujson import encode as json_encode, decode as json_decode
 from logging import WARN, DEBUG
-import sabo.filters
 
 import re
 import sys
@@ -83,7 +82,6 @@ class IRCClient(irc.IRCClient):
         from sabo.setting import reload_setting
         try:
             setting = reload_setting()
-            reload(sabo.filters)
             self.server = setting["servers"][self.servername]
             self.encodings = setting["encodings"]
             self.lineRate = self.server.get("linerate", None)
@@ -314,11 +312,31 @@ class IRCClient(irc.IRCClient):
 
         return None
 
+    def _redirect_rewrite(self, h, text):
+
+        d = defer.succeed(text)
+
+        if "rewrites" not in h:
+            return d
+
+        for wh in h["rewrites"]:
+            if "http" in wh:
+                d.addCallback(lambda x: getPage(wh["http"],
+                                                method="POST",
+                                                postdata=text.encode("UTF-8")))
+            elif "replace" in wh:
+                d.addCallback(lambda x: x.replace(wh["from"], wh["to"]))
+            elif "regex_replace" in wh:
+                d.addCallback(lambda x: re.sub(wh["match"], wh["to"], text))
+        d.addCallback(lambda x: x.decode("UTF-8"))
+        return d
+
     def _redirect(self, value, h, user, channel, text):
         if isinstance(value, Failure):
             log.msg(value.printTraceback())
         else:
             text = value
+
         items = map(lambda x: x.split("/", 2), h["redirect"])
         local_channels, remote_channels = list(), dict()
 
@@ -383,13 +401,8 @@ class IRCClient(irc.IRCClient):
             d.addBoth(self._handled)
 
         if "redirect" in h:
-            d = defer.succeed(text)
-            if "filters" in h:
-                for filter in h["filters"]:
-                    if filter == 'tinyurl':
-                        d.addCallback(sabo.filters.tinyurl)
-            d.addBoth(lambda x: threads.deferToThread(self._redirect, x, h,
-                                                      user, channel, text))
+            d = self._redirect_rewrite(h, text)
+            d.addBoth(self._redirect, h, user, channel, text)
 
     def lineReceived(self, line):
         log.msg(">> %s" % str(line), level=DEBUG)
