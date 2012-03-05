@@ -21,6 +21,10 @@ def _compile_regex(v):
         return v
 
 
+def compile_regex(v):
+    return dict(map(_compile_regex, v.items()))
+
+
 def reload_setting():
     global setting
     log.msg("reloading configuration: %s" % yaml)
@@ -41,29 +45,21 @@ def _init(_yaml):
     with codecs.open(yaml, "r", encoding="utf-8") as f:
         _setting = yaml_load(f.read())
 
-    # rearrange servers' data structure
-    try:
-        servers = dict()
-        for item in yaml_load(_setting["servers"]):
-            servers[item["name"]] = item
-        _setting["servers"] = servers
-    except Exception as e:
-        raise ConfigError("malformed server configuration: %s" % str(e))
+    _setting["servers"] = dict(map(lambda x: (x["name"], x),
+                                   _setting["servers"]))
 
-    # rearrange channels' data structure
-    try:
-        channels = dict()
-        for item in yaml_load(_setting["channels"]):
-            index = (item["server"], item["name"])
-            channels[index] = item
-        _setting["channels"] = channels
-    except Exception as e:
-        raise ConfigError("malformed channel configuration: %s" % str(e))
+    _setting["channels"] = dict(
+        map(lambda x: ((x["server"], x["name"]), x), _setting["channels"]))
+
+    if "encodings" in _setting:
+        _setting["encodings"] = map(compile_regex, _setting["encodings"])
+    else:
+        _setting["encodings"] = list()
 
     # rearrange handlers' data structure
     try:
         h = dict(privmsg=list(), user_joined=list(), joined=list())
-        for item in list(yaml_load(_setting["handlers"])) or []:
+        for item in _setting["handlers"]:
             if item["type"] in h:
                 data = dict(map(_compile_regex, item.items()))
                 h[item["type"]].append(data)
@@ -73,15 +69,5 @@ def _init(_yaml):
         _setting["handlers"] = h
     except Exception as e:
         raise ConfigError("malformed handler configuration: %s" % str(e))
-
-    # rearrange handlers' data structure
-    try:
-        encodings = list()
-        for item in yaml_load(_setting["encodings"]) or []:
-            data = dict(map(_compile_regex, item.items()))
-            encodings.append(data)
-        _setting["encodings"] = encodings
-    except Exception as e:
-        raise ConfigError("malformed encoding configuration: %s" % str(e))
 
     return _setting

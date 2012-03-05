@@ -6,29 +6,34 @@ controller:
   host: 127.0.0.1
   port: 55555
 
-servers: >
+servers:
   -
     name: freenode
-    nick: sabo
+    nick: sabo000
     host: irc.freenode.net
     port: 6667
     encoding: utf-8
 
   -
     name: bitlbee001
-    nick: sabo001
+    nick: sabo000
     host: im.bitlbee.org
     port: 6667
     encoding: utf-8
     ignore_target: "^(root|sabo\\d+)$"
 
-channels: >
+channels:
   -
     server: freenode
     name: '#sabo'
     encoding: utf-8
 
-handlers: >
+  -
+    server: freenode
+    name: '#sabo2'
+    encoding: utf-8
+
+handlers:
 
   -
     match_server: '^freenode$'
@@ -82,16 +87,19 @@ handlers: >
     match_channel: '&bitlbee'
     match_text: '.* identify yourself\.'
     type: privmsg
-    text: 'identify 123456'
+    text: 'identify taobao1234'
 
   -
     match_server: '^bitlbee\d+$'
     match_channel: '^sabo'
-    match_text: '.(?<!!).+|[^!]'
+    match_text: '.(?<!!).*'
     type: privmsg
-    prefix: '<%{user}>'
+    prefix: '<%{user}>: '
     filters:
-      - tinyurl
+      -
+        tinyurl: aaaa
+        http: xxx
+
     redirect:
       - "freenode/#sabo"
       - "bitlbee001/&bitlbee*"
@@ -99,15 +107,18 @@ handlers: >
   -
     match_server: '^freenode'
     match_channel: '^#sabo'
-    match_text: '.(?<!!).+|[^!]'
+    match_text: '.(?<!!).*'
     type: privmsg
-    prefix: '[%{user}]'
+    prefix: '[%{user}]: '
     filters:
       - tinyurl
-    redirect: 
+    redirect:
       - "bitlbee001/&bitlbee*"
 
-encodings: >
+encodings:
+  -
+    match_user: 'jianingy'
+    encoding: 'utf-8'
 
 
 # vim: ts=2 sw=2 ai et
