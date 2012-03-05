@@ -223,7 +223,7 @@ class IRCClient(irc.IRCClient):
     def schedule(self):
         while self._mq:
             message = self._mq.pop()
-            threads.deferToThread(self._send, message)
+            self._send(message)
 
     ##########################################################################
     # handler infrastructure
@@ -371,7 +371,9 @@ class IRCClient(irc.IRCClient):
         for servername, channels in remote_channels.items():
             reply = dict(channels=channels,
                          text=[u"%s%s" % (prefix, text)])
-            if servername in self.siblings:
+            siblings = self.siblings.keys()
+            random.shuffle(siblings)
+            if servername in siblings:
                 p = self.siblings[servername].protocol
                 p.mq_append(reply)
                 p.schedule()
@@ -424,10 +426,15 @@ class IRCClient(irc.IRCClient):
         return irc.IRCClient.connectionMade(self)
 
     def signedOn(self):
-        channels = filter(lambda x: x[0] == self.servername,
-                          self.channels.keys())
-        log.msg("join in %s" % channels)
-        return map(lambda x: self.join(x[1]), channels)
+        for index, value in self.channels.items():
+            servername, channel = index
+            if not servername == self.servername:
+                continue
+            log.msg("join in %s/%s" % (servername, channel))
+            if "password" in value:
+                self.join(channel, value["password"])
+            else:
+                self.join(channel)
 
     def _privmsg(self, user, channel, msg):
         text = self._decode(channel, msg)
