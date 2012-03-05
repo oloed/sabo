@@ -319,15 +319,21 @@ class IRCClient(irc.IRCClient):
         if "rewrites" not in h:
             return d
 
-        for wh in h["rewrites"]:
-            if "http" in wh:
-                d.addCallback(lambda x: getPage(wh["http"],
+        for rule in h["rewrites"]:
+            if "match_text" not in rule:
+                continue
+
+            if not rule["match_text"].search(text):
+                continue
+
+            if "http" in rule:
+                d.addCallback(lambda x: getPage(rule["http"],
                                                 method="POST",
                                                 postdata=text.encode("UTF-8")))
-            elif "replace" in wh:
-                d.addCallback(lambda x: x.replace(wh["from"], wh["to"]))
-            elif "regex_replace" in wh:
-                d.addCallback(lambda x: re.sub(wh["match"], wh["to"], text))
+            elif "text" in rule:
+                d.addCallback(lambda x:
+                              rule["match_text"].sub(rule["text"], text))
+
         d.addCallback(lambda x: x.decode("UTF-8"))
         return d
 

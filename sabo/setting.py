@@ -60,6 +60,8 @@ def _init(_yaml):
     try:
         h = dict(privmsg=list(), user_joined=list(), joined=list())
         for item in _setting["handlers"]:
+            if "rewrites" in item:
+                item["rewrites"] = map(compile_regex, item["rewrites"])
             if item["type"] in h:
                 data = dict(map(_compile_regex, item.items()))
                 h[item["type"]].append(data)
