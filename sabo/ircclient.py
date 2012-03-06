@@ -48,6 +48,7 @@ class IRCClient(irc.IRCClient):
             self.servername = servername
             self.server = setting["servers"][self.servername]
             self.lineRate = self.server.get("linerate", None)
+            self.schedule_interval = self.server.get("schedule_interval", 0.3)
             self.siblings = self.factory.siblings
             self.encodings = setting["encodings"]
             self.default_encoding = self.server.get("encoding", "UTF-8")
@@ -56,6 +57,7 @@ class IRCClient(irc.IRCClient):
             self.password = self.server.get("password", None)
             self.channels = setting["channels"]
             self.handlers = setting["handlers"]
+            self.last_schedule = time.time()
 
             if "ignore_target" in self.server:
                 self.ignore_target = re.compile(self.server["ignore_target"])
@@ -153,13 +155,41 @@ class IRCClient(irc.IRCClient):
     # Message Queue Manipulation
     ##########################################################################
 
-    def mq_append(self, data):
-        log.msg("mq_append[%s]: %s" % (self.servername, str(data)),
+    def mq_merge(self, data):
+
+        if not self._mq: return False
+
+        now = time.time()
+        last = self._mq[-1]
+        interval = now - last["start_time"]
+
+        if interval > self.schedule_interval: return False
+        if len(last["text"]) > 1 or len(data["text"]) > 1:
+            return False
+        if "channels" in data and data["channels"] != last["channels"]:
+            return False
+        if "users" in data and data["users"] != last["users"]:
+            return False
+
+        log.msg("mq_append[%s]: (merge) %s" % (self.servername, str(data)),
                 level=DEBUG)
+
+        self._mq[-1]["text"][0] += "\n" + data["text"][0]
+
+        return True
+
+    def mq_append(self, data):
         if not isinstance(data, dict):
             self._complain("mq data is not dict:")
             #traceback.print_stack()
             return
+
+        if self.mq_merge(data) == True:
+            return
+
+        log.msg("mq_append[%s]: (new) %s" % (self.servername, str(data)),
+                level=DEBUG)
+        data["start_time"] = time.time()
         self._mq.append(data)
 
     def rq_append(self, target, data):
@@ -228,8 +258,14 @@ class IRCClient(irc.IRCClient):
             return self._send_text(message)
 
     def schedule(self):
+        now = time.time()
+        if now - self.last_schedule  < self.schedule_interval:
+            elapsed = now - self.last_schedule
+            reactor.callLater(self.schedule_interval - elapsed, self.schedule)
+            return
+        self.last_schedule = now
         while self._mq:
-            message = self._mq.pop()
+            message = self._mq.pop(0)
             self._send(message)
 
     ##########################################################################
@@ -423,12 +459,12 @@ class IRCClient(irc.IRCClient):
                                             x, h, user, channel, text))
 
     def lineReceived(self, line):
-        log.msg(">> %s" % str(line), level=DEBUG)
+        log.msg(">> %s" % str(line))
         sys.stdout.flush()
         irc.IRCClient.lineReceived(self, line)
 
     def sendLine(self, line):
-        log.msg("<< %s" % str(line), level=DEBUG)
+        log.msg("<< %s" % str(line))
         irc.IRCClient.sendLine(self, line)
 
     ##########################################################################
