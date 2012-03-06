@@ -50,7 +50,7 @@ class IRCClient(irc.IRCClient):
             self.lineRate = self.server.get("linerate", None)
             self.schedule_interval = self.server.get("schedule_interval", 0.3)
             self.siblings = self.factory.siblings
-            self.encodings = setting["encodings"]
+            self.userinfo = setting["users"]
             self.default_encoding = self.server.get("encoding", "UTF-8")
             self.realname = setting["profile"].get("realname", self.realname)
             self.nickname = self.server.get("nick", self.nickname)
@@ -91,7 +91,7 @@ class IRCClient(irc.IRCClient):
         try:
             setting = reload_setting()
             self.server = setting["servers"][self.servername]
-            self.encodings = setting["encodings"]
+            self.userinfo = setting["users"]
             self.lineRate = self.server.get("linerate", None)
             self.default_encoding = setting["servers"].get("encoding", "UTF-8")
             self.channels = setting["channels"]
@@ -103,7 +103,7 @@ class IRCClient(irc.IRCClient):
             raise ConfigError("malformed configuration: %s" % str(e))
 
     def _match_encoding(self, channel):
-        for e in self.encodings:
+        for e in self.userinfo:
             if ("match_server" in e and
                 not e["match_server"].match(self.servername)):
                 continue
