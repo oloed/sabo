@@ -51,10 +51,10 @@ def _init(_yaml):
     _setting["channels"] = dict(
         map(lambda x: ((x["server"], x["name"]), x), _setting["channels"]))
 
-    if "encodings" in _setting:
-        _setting["encodings"] = map(compile_regex, _setting["encodings"])
+    if "users" in _setting:
+        _setting["users"] = map(compile_regex, _setting["users"])
     else:
-        _setting["encodings"] = list()
+        _setting["users"] = list()
 
     # rearrange handlers' data structure
     try:
