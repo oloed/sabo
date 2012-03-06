@@ -65,17 +65,23 @@ class IRCClient(irc.IRCClient):
         except Exception as e:
             raise ConfigError("malformed configuration: %s" % str(e))
 
-        self.context = dict(
-            nickname=self.nickname,
-            servername=self.servername,
-            version="%s/%s" % (self.versionName, self.versionNum))
         self._mq = list()
         self._rq = dict()
         self._users = dict()
 
+        self._reload_context()
+
     ##########################################################################
     # Basic Functions
     ##########################################################################
+
+    def _reload_context(self):
+        self.context = dict(
+            nickname=self.nickname,
+            servername=self.servername,
+            users=self._users,
+            channels=self.channels,
+            version="%s/%s" % (self.versionName, self.versionNum))
 
     def _reload(self):
         """reload reloadable settings :)"""
@@ -88,6 +94,7 @@ class IRCClient(irc.IRCClient):
             self.default_encoding = setting["servers"].get("encoding", "UTF-8")
             self.channels = setting["channels"]
             self.handlers = setting["handlers"]
+            self._reload_context()
             self.signedOn()
             self.schedule()
         except Exception as e:
@@ -334,7 +341,7 @@ class IRCClient(irc.IRCClient):
                 d.addCallback(lambda x:
                               rule["match_text"].sub(rule["text"], text))
 
-        d.addCallback(lambda x: x.decode("UTF-8"))
+        #d.addCallback(lambda x: x.decode("UTF-8"))
         return d
 
     def _redirect(self, value, h, user, channel, text):
@@ -398,6 +405,7 @@ class IRCClient(irc.IRCClient):
             postdata = json_encode(dict(servername=self.servername,
                                         user=user,
                                         channel=channel,
+                                        context=self.context,
                                         text=text))
             d = getPage(h["http"], method="POST", postdata=postdata)
             d.addCallback(self._http_done, user, channel)
